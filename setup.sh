@@ -6,6 +6,8 @@
 #   2. Firstmate  the agent crew you talk to                   (git clone)
 #   3. Skills     Matt Pocock's engineering skills, from the lab's fork, into
 #                 whichever of Claude Code, Codex and Pi you already have.
+#   4. WezTerm    the terminal app (Homebrew on macOS), its JetBrainsMono Nerd
+#                 Font, and KevinSilvester/wezterm-config        (git clone)
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/lobennett/agentic-engineering/main/setup.sh | bash
@@ -15,7 +17,8 @@
 #
 # Re-running is safe: anything already installed is left alone, an existing
 # Firstmate checkout is never pulled or reset, and a non-Firstmate directory at
-# the Firstmate path makes the script stop instead of touching it.
+# the Firstmate path makes the script stop instead of touching it. Any WezTerm
+# config you already have is left alone and the upstream config is not cloned.
 #
 # Environment overrides:
 #   AE_FIRSTMATE_DIR    Firstmate checkout path        (default: $HOME/firstmate)
@@ -23,6 +26,7 @@
 #   AE_SKILLS_REPO      skills repository, owner/name  (default: lobennett/skills)
 #   AE_HERDR_INSTALLER  Herdr installer URL            (default: https://herdr.dev/install.sh)
 #   AE_BIN_DIR          where Herdr is installed       (default: $HOME/.local/bin)
+#   AE_WEZTERM_CONFIG_REPO  WezTerm config git URL     (default: https://github.com/KevinSilvester/wezterm-config)
 set -euo pipefail
 
 AE_FIRSTMATE_DIR=${AE_FIRSTMATE_DIR:-$HOME/firstmate}
@@ -30,6 +34,7 @@ AE_FIRSTMATE_REPO=${AE_FIRSTMATE_REPO:-https://github.com/lobennett/firstmate}
 AE_SKILLS_REPO=${AE_SKILLS_REPO:-lobennett/skills}
 AE_HERDR_INSTALLER=${AE_HERDR_INSTALLER:-https://herdr.dev/install.sh}
 AE_BIN_DIR=${AE_BIN_DIR:-$HOME/.local/bin}
+AE_WEZTERM_CONFIG_REPO=${AE_WEZTERM_CONFIG_REPO:-https://github.com/KevinSilvester/wezterm-config}
 
 # Names declared by the skills repository's own .claude-plugin manifests.
 SKILLS_PLUGIN=mattpocock-skills
@@ -289,6 +294,149 @@ step_skills() {
   note "In each project, run /setup-matt-pocock-skills once; then try /grill-with-docs or /ask-matt."
 }
 
+# --- 4. WezTerm --------------------------------------------------------------
+
+# Requirements stated in the wezterm-config README: WezTerm 20240127-113634-bbcac864
+# or newer (nightly recommended) and the JetBrainsMono Nerd Font.
+WEZTERM_MIN_VERSION=20240127
+WEZTERM_CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/wezterm
+
+wezterm_app() {
+  local bin app version
+  bin=$(command -v wezterm 2>/dev/null || true)
+  for app in /Applications/WezTerm.app "$HOME/Applications/WezTerm.app"; do
+    [ -n "$bin" ] || [ ! -x "$app/Contents/MacOS/wezterm" ] || bin=$app/Contents/MacOS/wezterm
+  done
+  if [ -n "$bin" ]; then
+    version=$("$bin" --version 2>/dev/null | head -n 1 || true)
+    ok "installed: $version at $bin"
+    case "${version#wezterm }" in
+      [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-*)
+        version=${version#wezterm }
+        [ "${version%%-*}" -ge "$WEZTERM_MIN_VERSION" ] ||
+          note "Update WezTerm: the config needs $WEZTERM_MIN_VERSION or newer (nightly recommended)."
+        ;;
+    esac
+    return 0
+  fi
+  if [ "$(uname -s)" != Darwin ]; then
+    todo "WezTerm: not found"
+    note "Install WezTerm (the config recommends nightly): https://wezterm.org/install/linux.html"
+    return 0
+  fi
+  if ! command -v brew >/dev/null 2>&1; then
+    todo "WezTerm: not found, and Homebrew is not available to install it"
+    note "Install WezTerm (the config recommends nightly): https://wezterm.org/install/macos.html"
+    return 0
+  fi
+  if ! confirm "Install WezTerm nightly, as the config recommends (brew install --cask wezterm@nightly)?"; then
+    todo "skipped the WezTerm app"
+    return 0
+  fi
+  brew install --cask wezterm@nightly || die "brew install --cask wezterm@nightly failed"
+  ok "installed WezTerm nightly (update with: brew upgrade --cask wezterm@nightly --greedy-latest)"
+}
+
+wezterm_font() {
+  local dir
+  for dir in "$HOME/Library/Fonts" /Library/Fonts "${XDG_DATA_HOME:-$HOME/.local/share}/fonts" "$HOME/.fonts"; do
+    if [ -d "$dir" ] && [ -n "$(find "$dir" -maxdepth 3 -name 'JetBrainsMonoNerdFont-*' -print 2>/dev/null | head -n 1)" ]; then
+      ok "JetBrainsMono Nerd Font: found in $dir"
+      return 0
+    fi
+  done
+  if [ "$(uname -s)" != Darwin ] || ! command -v brew >/dev/null 2>&1; then
+    todo "JetBrainsMono Nerd Font: not found"
+    note "Install the JetBrainsMono Nerd Font the config uses: https://www.nerdfonts.com/font-downloads"
+    return 0
+  fi
+  if ! confirm "Install the JetBrainsMono Nerd Font the config uses (brew install --cask font-jetbrains-mono-nerd-font)?"; then
+    todo "skipped the JetBrainsMono Nerd Font"
+    return 0
+  fi
+  brew install --cask font-jetbrains-mono-nerd-font || die "brew install --cask font-jetbrains-mono-nerd-font failed"
+  ok "installed JetBrainsMono Nerd Font"
+}
+
+is_wezterm_config_checkout() {
+  local origin
+  [ -f "$1/wezterm.lua" ] || return 1
+  origin=$(git -C "$1" remote get-url origin 2>/dev/null) || return 1
+  [ "${origin%.git}" = "${AE_WEZTERM_CONFIG_REPO%.git}" ]
+}
+
+# The config's README has you point config/launch.lua at your own shell (setup
+# step 2): it starts fish, from /opt/homebrew/bin on macOS. When fish is not
+# there, offer to make that one-line change for the login shell.
+wezterm_shell() {
+  local launch="$WEZTERM_CONFIG_DIR/config/launch.lua" fish line shell
+  case "$(uname -s)" in
+    Darwin) fish=/opt/homebrew/bin/fish ;;
+    *) fish=fish ;;
+  esac
+  line="options.default_prog = { '$fish', '-l' }"
+  grep -F "$line" "$launch" >/dev/null 2>&1 || return 0
+  if command -v "$fish" >/dev/null 2>&1; then
+    ok "default shell: fish ($fish)"
+    return 0
+  fi
+  shell=${SHELL:-/bin/bash}
+  if ! confirm "The config starts fish, which is not installed. Start your login shell ($shell) instead, in config/launch.lua?"; then
+    todo "left config/launch.lua starting fish"
+    note "WezTerm cannot open a shell until you install fish or change default_prog in $launch"
+    return 0
+  fi
+  local tmp
+  tmp=$(mktemp "${TMPDIR:-/tmp}/launch.lua.XXXXXX")
+  if ! awk -v old="$line" -v new="options.default_prog = { '$shell', '-l' }" '
+    { i = index($0, old); if (i) $0 = substr($0, 1, i - 1) new substr($0, i + length(old)); print }
+  ' "$launch" >"$tmp" || ! cat "$tmp" >"$launch"; then
+    rm -f "$tmp"
+    die "could not update $launch"
+  fi
+  rm -f "$tmp"
+  ok "default shell: $shell (a local change in config/launch.lua; see git -C $WEZTERM_CONFIG_DIR diff)"
+}
+
+wezterm_config() {
+  if is_wezterm_config_checkout "$WEZTERM_CONFIG_DIR"; then
+    ok "config present at $WEZTERM_CONFIG_DIR ($(git -C "$WEZTERM_CONFIG_DIR" log -1 --format='%h, %cs' 2>/dev/null || echo 'unknown revision'))"
+    ok "update with: git -C $WEZTERM_CONFIG_DIR pull --ff-only --no-rebase"
+    wezterm_shell
+    return 0
+  fi
+  # WezTerm reads the first of these that exists, so any one outside the
+  # checkout would either hide the new config or be hidden by it.
+  local found=() f
+  [ ! -e "$WEZTERM_CONFIG_DIR" ] || found+=("$WEZTERM_CONFIG_DIR")
+  for f in "${WEZTERM_CONFIG_FILE:-}" "$HOME/.config/wezterm/wezterm.lua" "$HOME/.wezterm.lua"; do
+    case "$f" in "" | "$WEZTERM_CONFIG_DIR"/*) continue ;; esac
+    [ ! -e "$f" ] || found+=("$f")
+  done
+  if [ ${#found[@]} -gt 0 ]; then
+    for f in "${found[@]}"; do
+      todo "existing WezTerm config: $f (left untouched)"
+    done
+    note "To use $AE_WEZTERM_CONFIG_REPO, move your WezTerm config aside (or unset WEZTERM_CONFIG_FILE), then re-run."
+    return 0
+  fi
+  if ! confirm "Clone the WezTerm config ($AE_WEZTERM_CONFIG_REPO) into $WEZTERM_CONFIG_DIR?"; then
+    todo "skipped the WezTerm config"
+    return 0
+  fi
+  mkdir -p "$(dirname "$WEZTERM_CONFIG_DIR")"
+  git clone "$AE_WEZTERM_CONFIG_REPO" "$WEZTERM_CONFIG_DIR" || die "git clone of $AE_WEZTERM_CONFIG_REPO failed"
+  ok "cloned to $WEZTERM_CONFIG_DIR ($(git -C "$WEZTERM_CONFIG_DIR" log -1 --format='%h, %cs'))"
+  wezterm_shell
+}
+
+step_wezterm() {
+  say "WezTerm"
+  wezterm_app
+  wezterm_font
+  wezterm_config
+}
+
 # --- run ---------------------------------------------------------------------
 
 main() {
@@ -307,13 +455,14 @@ main() {
   step_herdr
   step_firstmate
   step_skills
+  step_wezterm
 
   say "Next"
   local line
   for line in "${NOTES[@]+"${NOTES[@]}"}"; do
     todo "$line"
   done
-  ok "Start Herdr with: herdr"
+  ok "Open WezTerm and start Herdr in it with: herdr   (Sherlock: run ssh sherlock in a WezTerm tab)"
   local tilde="~" fm_display
   fm_display=${AE_FIRSTMATE_DIR/#"$HOME"/$tilde}
   ok "In a Herdr pane, start your first mate: cd $fm_display && claude   (or codex, or pi)"
