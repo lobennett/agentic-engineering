@@ -98,12 +98,15 @@ STUB
 }
 
 # A fake "official installer" served over file://; it honors HERDR_INSTALL_DIR
-# like the real one and drops a stub binary there.
+# like the real one and drops a stub binary there. It also drains stdin, as any
+# child that reads stdin would under curl | bash.
 make_fake_herdr_installer() { # <path> [exit-code]
   cat >"$1" <<STUB
 #!/bin/sh
 set -eu
 [ "${2:-0}" = 0 ] || exit ${2:-0}
+cat >/dev/null
+echo "herdr installer" >>"\$AE_TEST_STATE/calls.log"
 mkdir -p "\$HERDR_INSTALL_DIR"
 printf '#!/bin/sh\n[ "\$1" = --version ] && echo "herdr 0.0.0-fake"\n' >"\$HERDR_INSTALL_DIR/herdr"
 chmod +x "\$HERDR_INSTALL_DIR/herdr"
@@ -150,6 +153,14 @@ run_setup() { # <args...>; sets RC and OUT
   RC=$?
 }
 
+piped_setup() { # <args...>; like run_setup, but feeds the script to bash on stdin
+  OUT=$(HOME="$HOME_DIR" PATH="$STUBS:$REAL_BIN" TMPDIR="$WORK/$CASE" \
+    AE_HERDR_INSTALLER="${AE_HERDR_INSTALLER:-file://$WORK/no-installer}" \
+    AE_FIRSTMATE_REPO="${AE_FIRSTMATE_REPO:-file://$WORK/no-repo}" \
+    bash -s -- "$@" <"$SETUP" 2>&1)
+  RC=$?
+}
+
 check() { # <description> <condition...>
   local desc=$1
   shift
@@ -169,7 +180,7 @@ calls() { cat "$AE_TEST_STATE/calls.log" 2>/dev/null || true; }
 
 test_missing_prerequisites_fail_check() {
   new_case missing-prereqs # no gh, no node
-  run_setup --check
+  run_setup --yes
   check "exit 1" [ "$RC" = 1 ]
   check "names gh" contains "$OUT" "gh: not found"
   check "names node" contains "$OUT" "node: not found"
@@ -181,20 +192,6 @@ test_unknown_option() {
   run_setup --bogus
   check "exit 2" [ "$RC" = 2 ]
   check "says unknown" contains "$OUT" "unknown option --bogus"
-}
-
-test_check_mode_changes_nothing() {
-  new_case check-mode gh node claude codex pi
-  local before after
-  before=$(tree_digest "$HOME_DIR")
-  run_setup --check
-  after=$(tree_digest "$HOME_DIR")
-  check "exit 0" [ "$RC" = 0 ]
-  check "reports herdr todo" contains "$OUT" "not installed; would run the official installer"
-  check "reports firstmate todo" contains "$OUT" "would clone"
-  check "reports skills todo" contains "$OUT" "Claude Code: would add marketplace"
-  check "home untouched" [ "$before" = "$after" ]
-  check "no stub calls" [ -z "$(calls)" ]
 }
 
 test_clean_install_then_repeat() {
@@ -209,7 +206,7 @@ test_clean_install_then_repeat() {
   check "PATH note when ~/.local/bin is not on PATH" contains "$OUT" "Add Herdr to your PATH"
   check "gh login note" contains "$OUT" "gh auth login"
   local expected
-  expected=$(printf '%s\n' "claude marketplace add lobennett/skills" "claude install mattpocock-skills@mattpocock" \
+  expected=$(printf '%s\n' "herdr installer" "claude marketplace add lobennett/skills" "claude install mattpocock-skills@mattpocock" \
     "codex marketplace add lobennett/skills" "codex add mattpocock-skills@mattpocock" "pi install git:github.com/lobennett/skills")
   check "exactly the documented install commands ran" [ "$(calls)" = "$expected" ]
 
@@ -218,23 +215,33 @@ test_clean_install_then_repeat() {
   AE_HERDR_INSTALLER="file://$WORK/$CASE/install.sh" AE_FIRSTMATE_REPO="$WORK/$CASE/firstmate.git" run_setup --yes
   after=$(tree_digest "$HOME_DIR")
   check "repeat exit 0" [ "$RC" = 0 ]
-  check "repeat reports herdr installed" contains "$OUT" "installed: herdr 0.0.0-fake"
+  check "repeat finds herdr off PATH" contains "$OUT" "installed: herdr 0.0.0-fake at $HOME_DIR/.local/bin/herdr"
+  check "repeat names the herdr update command" contains "$OUT" "update any time with: herdr update"
+  check "repeat still notes the PATH change" contains "$OUT" "Add Herdr to your PATH"
   check "repeat reports checkout present" contains "$OUT" "checkout present"
   check "repeat reports skills installed" contains "$OUT" "Pi: package git:github.com/lobennett/skills installed"
+  check "repeat sees codex plugin despite a long listing" contains "$OUT" "Codex: $SKILLS_PLUGIN_NAME installed"
   check "repeat names the Claude update command" contains "$OUT" "claude plugin update mattpocock-skills@mattpocock"
   check "repeat changes no file" [ "$before" = "$after" ]
   check "repeat issues no install command" [ "$(calls)" = "$expected" ]
+}
 
-  AE_HERDR_INSTALLER="file://$WORK/$CASE/install.sh" AE_FIRSTMATE_REPO="$WORK/$CASE/firstmate.git" run_setup --check
-  check "check after install exit 0" [ "$RC" = 0 ]
-  check "check sees codex plugin despite a long listing" contains "$OUT" "Codex: $SKILLS_PLUGIN_NAME installed"
+test_piped_install_runs_to_the_end() {
+  new_case piped gh node pi
+  make_fake_herdr_installer "$WORK/$CASE/install.sh"
+  make_fake_firstmate_repo "$WORK/$CASE/firstmate.git"
+  AE_HERDR_INSTALLER="file://$WORK/$CASE/install.sh" AE_FIRSTMATE_REPO="$WORK/$CASE/firstmate.git" piped_setup --yes
+  check "exit 0" [ "$RC" = 0 ]
+  check "firstmate cloned after the installer drained stdin" [ -f "$HOME_DIR/firstmate/AGENTS.md" ]
+  check "skills installed" [ "$(calls)" = "$(printf '%s\n' "herdr installer" "pi install git:github.com/lobennett/skills")" ]
+  check "final instructions printed" contains "$OUT" "Its first session checks its own toolchain"
 }
 
 test_skills_repo_override() {
   new_case skills-override gh node herdr pi
   mkdir -p "$HOME_DIR/firstmate/bin" && echo x >"$HOME_DIR/firstmate/AGENTS.md" && : >"$HOME_DIR/firstmate/bin/fm-bootstrap.sh"
   git -C "$HOME_DIR/firstmate" init -q
-  AE_SKILLS_REPO=someone/else run_setup --yes --skip-herdr --skip-firstmate
+  AE_SKILLS_REPO=someone/else run_setup --yes
   check "exit 0" [ "$RC" = 0 ]
   check "pi installs the override" [ "$(calls)" = "pi install git:github.com/someone/else" ]
 }
@@ -245,7 +252,7 @@ test_refuses_foreign_firstmate_dir() {
   echo "my notes" >"$HOME_DIR/firstmate/notes.txt"
   local before after
   before=$(tree_digest "$HOME_DIR")
-  run_setup --yes --skip-skills
+  run_setup --yes
   after=$(tree_digest "$HOME_DIR")
   check "exit 1" [ "$RC" = 1 ]
   check "explains" contains "$OUT" "is not a Firstmate checkout; it was left untouched"
@@ -258,7 +265,7 @@ test_preserves_existing_backend_config() {
   make_fake_firstmate_repo "$WORK/$CASE/firstmate.git"
   git clone -q "$WORK/$CASE/firstmate.git" "$HOME_DIR/firstmate"
   mkdir -p "$HOME_DIR/firstmate/config" && printf 'tmux\n' >"$HOME_DIR/firstmate/config/backend"
-  run_setup --yes --skip-skills
+  run_setup --yes
   check "exit 0" [ "$RC" = 0 ]
   check "backend still tmux" [ "$(cat "$HOME_DIR/firstmate/config/backend")" = tmux ]
   check "says left alone" contains "$OUT" "already set to 'tmux' (left alone)"
@@ -266,7 +273,7 @@ test_preserves_existing_backend_config() {
 
 test_herdr_download_failure_propagates() {
   new_case download-fail gh node
-  AE_HERDR_INSTALLER="http://127.0.0.1:1/install.sh" run_setup --yes --skip-firstmate --skip-skills
+  AE_HERDR_INSTALLER="http://127.0.0.1:1/install.sh" run_setup --yes
   check "exit 1" [ "$RC" = 1 ]
   check "names the failure" contains "$OUT" "could not download the Herdr installer"
   check "nothing installed" [ ! -e "$HOME_DIR/.local/bin/herdr" ]
@@ -275,14 +282,14 @@ test_herdr_download_failure_propagates() {
 test_herdr_installer_failure_propagates() {
   new_case installer-fail gh node
   make_fake_herdr_installer "$WORK/$CASE/install.sh" 7
-  AE_HERDR_INSTALLER="file://$WORK/$CASE/install.sh" run_setup --yes --skip-firstmate --skip-skills
+  AE_HERDR_INSTALLER="file://$WORK/$CASE/install.sh" run_setup --yes
   check "exit 1" [ "$RC" = 1 ]
   check "names the failure" contains "$OUT" "the Herdr installer failed"
 }
 
 test_clone_failure_propagates() {
   new_case clone-fail gh node herdr
-  AE_FIRSTMATE_REPO="$WORK/$CASE/missing.git" run_setup --yes --skip-skills
+  AE_FIRSTMATE_REPO="$WORK/$CASE/missing.git" run_setup --yes
   check "exit 1" [ "$RC" = 1 ]
   check "names the failure" contains "$OUT" "git clone of"
   check "no partial checkout" [ ! -e "$HOME_DIR/firstmate" ]

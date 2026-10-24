@@ -9,9 +9,8 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/lobennett/agentic-engineering/main/setup.sh | bash
-#   ./setup.sh [--check] [--yes] [--skip-herdr] [--skip-firstmate] [--skip-skills]
+#   ./setup.sh [--yes]
 #
-#   --check   report what is installed and what would change; change nothing
 #   --yes     answer yes to every install question (for scripted use)
 #
 # Re-running is safe: anything already installed is left alone, an existing
@@ -36,34 +35,17 @@ AE_BIN_DIR=${AE_BIN_DIR:-$HOME/.local/bin}
 SKILLS_PLUGIN=mattpocock-skills
 SKILLS_MARKETPLACE=mattpocock
 
-CHECK_ONLY=0
 ASSUME_YES=0
-DO_HERDR=1
-DO_FIRSTMATE=1
-DO_SKILLS=1
-PROBLEMS=0
 NOTES=()
 
 usage() {
-  sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+  printf 'Usage: setup.sh [--yes]\n  --yes  answer yes to every install question (for scripted use)\n'
 }
-
-for arg in "$@"; do
-  case "$arg" in
-    --check) CHECK_ONLY=1 ;;
-    --yes | -y) ASSUME_YES=1 ;;
-    --skip-herdr) DO_HERDR=0 ;;
-    --skip-firstmate) DO_FIRSTMATE=0 ;;
-    --skip-skills) DO_SKILLS=0 ;;
-    -h | --help) usage; exit 0 ;;
-    *) printf 'setup.sh: unknown option %s\n\n' "$arg" >&2; usage >&2; exit 2 ;;
-  esac
-done
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 ok() { printf '  \033[32m+\033[0m %s\n' "$*"; }
 todo() { printf '  \033[33m-\033[0m %s\n' "$*"; }
-fail() { printf '  \033[31m!\033[0m %s\n' "$*" >&2; PROBLEMS=$((PROBLEMS + 1)); }
+fail() { printf '  \033[31m!\033[0m %s\n' "$*" >&2; }
 die() { printf '  \033[31m!\033[0m %s\n' "$*" >&2; exit 1; }
 note() { NOTES+=("$*"); }
 
@@ -75,7 +57,7 @@ confirm() {
   if [ "$ASSUME_YES" = 1 ]; then
     return 0
   fi
-  has_tty || die "cannot ask '$1': no terminal. Re-run with --yes to accept, or --skip-* to leave it out."
+  has_tty || die "cannot ask '$1': no terminal. Re-run with --yes to accept every step."
   local answer
   printf '  %s [y/N] ' "$1" >/dev/tty
   read -r answer </dev/tty || answer=
@@ -156,13 +138,15 @@ check_harnesses() {
 
 step_herdr() {
   say "Herdr"
-  if command -v herdr >/dev/null 2>&1; then
-    ok "installed: $(herdr --version 2>/dev/null | head -n 1) at $(command -v herdr)"
-    ok "update any time with: herdr update"
-    return 0
+  local herdr_bin
+  herdr_bin=$(command -v herdr 2>/dev/null || true)
+  if [ -z "$herdr_bin" ] && [ -x "$AE_BIN_DIR/herdr" ]; then
+    herdr_bin=$AE_BIN_DIR/herdr
   fi
-  if [ "$CHECK_ONLY" = 1 ]; then
-    todo "not installed; would run the official installer from $AE_HERDR_INSTALLER into $AE_BIN_DIR"
+  if [ -n "$herdr_bin" ]; then
+    ok "installed: $("$herdr_bin" --version 2>/dev/null | head -n 1) at $herdr_bin"
+    ok "update any time with: herdr update"
+    note_path_if_missing
     return 0
   fi
   if ! confirm "Install Herdr with the official installer ($AE_HERDR_INSTALLER) into $AE_BIN_DIR?"; then
@@ -184,10 +168,12 @@ step_herdr() {
   rm -f "$installer"
   [ -x "$AE_BIN_DIR/herdr" ] || die "expected $AE_BIN_DIR/herdr after install, found nothing"
   ok "installed: $("$AE_BIN_DIR/herdr" --version | head -n 1)"
-  case ":$PATH:" in
-    *":$AE_BIN_DIR:"*) ;;
-    *) note "Add Herdr to your PATH (shell rc file): export PATH=\"$AE_BIN_DIR:\$PATH\"" ;;
-  esac
+  note_path_if_missing
+}
+
+note_path_if_missing() {
+  command -v herdr >/dev/null 2>&1 ||
+    note "Add Herdr to your PATH (shell rc file): export PATH=\"$AE_BIN_DIR:\$PATH\""
 }
 
 # --- 2. Firstmate ------------------------------------------------------------
@@ -205,10 +191,6 @@ write_firstmate_config() {
     ok "config/backend already set to '$(head -n 1 "$cfg/backend")' (left alone)"
     return 0
   fi
-  if [ "$CHECK_ONLY" = 1 ]; then
-    todo "would write config/backend = herdr"
-    return 0
-  fi
   mkdir -p "$cfg"
   printf 'herdr\n' >"$cfg/backend"
   ok "config/backend = herdr"
@@ -224,12 +206,7 @@ step_firstmate() {
       return 0
     fi
     fail "$AE_FIRSTMATE_DIR exists and is not a Firstmate checkout; it was left untouched"
-    [ "$CHECK_ONLY" = 1 ] && return 0
     die "move that directory, or set AE_FIRSTMATE_DIR to another path, then re-run"
-  fi
-  if [ "$CHECK_ONLY" = 1 ]; then
-    todo "not present; would clone $AE_FIRSTMATE_REPO into $AE_FIRSTMATE_DIR"
-    return 0
   fi
   if ! confirm "Clone Firstmate ($AE_FIRSTMATE_REPO) into $AE_FIRSTMATE_DIR?"; then
     todo "skipped Firstmate"
@@ -252,10 +229,6 @@ skills_claude() {
     ok "Claude Code: $SKILLS_PLUGIN installed (update with: claude plugin update $SKILLS_PLUGIN@$SKILLS_MARKETPLACE)"
     return 0
   fi
-  if [ "$CHECK_ONLY" = 1 ]; then
-    todo "Claude Code: would add marketplace github.com/$AE_SKILLS_REPO and install $SKILLS_PLUGIN"
-    return 0
-  fi
   if ! confirm "Claude Code: add marketplace github.com/$AE_SKILLS_REPO and install $SKILLS_PLUGIN?"; then
     todo "skipped Claude Code skills"
     return 0
@@ -276,10 +249,6 @@ skills_codex() {
     ok "Codex: $SKILLS_PLUGIN installed (refreshed at startup)"
     return 0
   fi
-  if [ "$CHECK_ONLY" = 1 ]; then
-    todo "Codex: would add marketplace $AE_SKILLS_REPO and install $SKILLS_PLUGIN"
-    return 0
-  fi
   if ! confirm "Codex: add marketplace $AE_SKILLS_REPO and install $SKILLS_PLUGIN?"; then
     todo "skipped Codex skills"
     return 0
@@ -297,10 +266,6 @@ skills_pi() {
   installed=$(pi list 2>/dev/null || true)
   if printf '%s\n' "$installed" | grep -F "$source" >/dev/null; then
     ok "Pi: package $source installed (update with: pi update $source)"
-    return 0
-  fi
-  if [ "$CHECK_ONLY" = 1 ]; then
-    todo "Pi: would install package $source"
     return 0
   fi
   if ! confirm "Pi: install package $source?"; then
@@ -326,27 +291,33 @@ step_skills() {
 
 # --- run ---------------------------------------------------------------------
 
-check_platform
-check_prerequisites
-check_harnesses
-[ "$DO_HERDR" = 1 ] && step_herdr
-[ "$DO_FIRSTMATE" = 1 ] && step_firstmate
-[ "$DO_SKILLS" = 1 ] && step_skills
+main() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in
+      --yes | -y) ASSUME_YES=1 ;;
+      -h | --help) usage; exit 0 ;;
+      *) printf 'setup.sh: unknown option %s\n\n' "$arg" >&2; usage >&2; exit 2 ;;
+    esac
+  done
 
-say "Next"
-if [ "$CHECK_ONLY" = 1 ]; then
-  if [ "$PROBLEMS" -gt 0 ]; then
-    fail "$PROBLEMS problem(s) above need attention"
-    exit 1
-  fi
-  ok "check complete; run without --check to install what is marked '-'"
-  exit 0
-fi
-for line in "${NOTES[@]+"${NOTES[@]}"}"; do
-  todo "$line"
-done
-ok "Start Herdr with: herdr"
-tilde="~"
-fm_display=${AE_FIRSTMATE_DIR/#"$HOME"/$tilde}
-ok "In a Herdr pane, start your first mate: cd $fm_display && claude   (or codex, or pi)"
-ok "Its first session checks its own toolchain and asks before installing anything."
+  check_platform
+  check_prerequisites
+  check_harnesses
+  step_herdr
+  step_firstmate
+  step_skills
+
+  say "Next"
+  local line
+  for line in "${NOTES[@]+"${NOTES[@]}"}"; do
+    todo "$line"
+  done
+  ok "Start Herdr with: herdr"
+  local tilde="~" fm_display
+  fm_display=${AE_FIRSTMATE_DIR/#"$HOME"/$tilde}
+  ok "In a Herdr pane, start your first mate: cd $fm_display && claude   (or codex, or pi)"
+  ok "Its first session checks its own toolchain and asks before installing anything."
+}
+
+main "$@"

@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/lobennett/agentic-engineering/main/
 
 Prefer to read it first? `git clone https://github.com/lobennett/agentic-engineering && agentic-engineering/setup.sh`
 
-The script asks before each step. `setup.sh --check` only reports. `--yes` answers every question, for scripted use. `--skip-herdr`, `--skip-firstmate` and `--skip-skills` leave a step out.
+The script asks before each step; decline one to leave it out. `--yes` answers every question, for scripted use.
 
 ## What changes on disk
 
@@ -60,4 +60,4 @@ The skills fork follows upstream through `gh repo sync lobennett/skills`.
 
 ## Repository
 
-`setup.sh` is the whole installer. `tests/run.sh` runs it offline in a throwaway HOME with stub tools. `examples/firstmate-config/` documents the one Firstmate setting written. MIT licensed; Herdr, Firstmate and the skills keep their own licenses.
+`setup.sh` is the whole installer. `tests/run.sh` runs it offline in a throwaway HOME with stub tools. MIT licensed; Herdr, Firstmate and the skills keep their own licenses.
