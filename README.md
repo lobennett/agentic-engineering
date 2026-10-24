@@ -47,7 +47,7 @@ herdr                      # the terminal runtime
 cd ~/firstmate && claude   # in a Herdr pane; or codex, or pi
 ```
 
-For Sherlock, run `ssh sherlock` in a WezTerm tab. It uses your SSH config; set up the `sherlock` host with Sherlock's [connection guide](https://www.sherlock.stanford.edu/docs/advanced-topics/connection/). Nothing is installed on Sherlock.
+For Sherlock, run `ssh sherlock` in a WezTerm tab. Set up the `sherlock` SSH host with Sherlock's [connection guide](https://www.sherlock.stanford.edu/docs/advanced-topics/connection/). Nothing is installed on Sherlock.
 
 Ask the first mate: "look at my repo X, fix the flaky test and open a PR". Its first session checks its toolchain and asks before installing anything.
 
@@ -60,7 +60,7 @@ Re-run the install command. Installed pieces are skipped; existing checkouts are
 - Herdr: `herdr update`
 - Firstmate: `/updatefirstmate` inside a session (fast-forward only)
 - Skills: Claude Code: `claude plugin update mattpocock-skills@mattpocock`. Codex refreshes at startup. Pi: `pi update git:github.com/lobennett/skills`
-- WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`. Config: `git -C ~/.config/wezterm pull --ff-only --no-rebase` (keeps a `launch.lua` change)
+- WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`. Config: `git -C ~/.config/wezterm pull --ff-only --no-rebase` (a `launch.lua` edit survives unless upstream changed it; then git refuses, changing nothing)
 
 ## Repository
 

@@ -446,7 +446,8 @@ test_wezterm_leaves_existing_configs_alone() {
     check "names the existing config" contains "$OUT" "(left untouched)"
     check "says how to switch" contains "$OUT" "move your WezTerm config aside"
     check "no file changed" [ "$before" = "$after" ]
-    check "nothing cloned" [ ! -e "$HOME_DIR/xdg" ] && [ ! -e "$HOME_DIR/.config/wezterm/.git" ]
+    check "no XDG config created" [ ! -e "$HOME_DIR/xdg" ]
+    check "nothing cloned" [ ! -e "$HOME_DIR/.config/wezterm/.git" ]
   done
 }
 
