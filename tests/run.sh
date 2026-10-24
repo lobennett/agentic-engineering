@@ -309,11 +309,11 @@ test_no_private_material_in_repo() {
   local files hits
   files=$(git -C "$ROOT" ls-files | grep -v '^tests/run.sh$')
   # Patterns are assembled so this file does not match itself.
-  hits=$(cd "$ROOT" && printf '%s\n' "$files" | xargs grep -n -E \
+  hits=$(cd "$ROOT" || exit; printf '%s\n' "$files" | xargs grep -n -E \
     -e '/Users/[a-z]' -e '/home/[a-z]' \
     -e 'gh[op]_[A-Za-z0-9]{20,}' -e 'github_pat_' -e 'sk-[A-Za-z0-9]{20,}' -e 'AKIA[0-9A-Z]{12,}' \
     -e 'BEGIN [A-Z ]*PRIVATE KEY' -e '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.(edu|com|org)' \
-    -e 'FMX_PAIRING_TOKEN=' -- 2>/dev/null || true)
+    -e 'FMX_PAIRING_TOKEN=' -- 2>/dev/null) || true
   check "no absolute home paths, tokens, keys or addresses in tracked files" [ -z "$hits" ]
   [ -z "$hits" ] || printf '%s\n' "$hits" >&2
   check "no state/data/no-mistakes directories committed" [ -z "$(printf '%s\n' "$files" | grep -E '^(state|data|\.no-mistakes|config)/')" ]
