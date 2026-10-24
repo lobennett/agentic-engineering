@@ -4,7 +4,7 @@
 # Every test runs setup.sh inside a throwaway HOME with a hermetic PATH: real
 # git/curl/jq, plus stub gh, node, herdr, claude, codex and pi that only record
 # what they were asked to do. Nothing is downloaded and nothing on this machine
-# changes. This proves the script's flow control (prerequisites, consent flags,
+# changes. This proves the script's flow control (prerequisites, consent prompts,
 # idempotence, refusal, error propagation), not that the upstream installers
 # work; run setup.sh for real in a spare HOME for that.
 set -uo pipefail
