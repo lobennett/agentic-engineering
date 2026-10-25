@@ -62,6 +62,15 @@ Re-running the installer skips installed pieces and never pulls or resets checko
 - Skills: Claude Code: `claude plugin update mattpocock-skills@mattpocock`. Codex refreshes at startup. Pi: `pi update git:github.com/lobennett/skills`
 - WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`; config: `git -C ~/.config/wezterm pull --ff-only --no-rebase` (git refuses, changing nothing, if upstream changed your edited `launch.lua`)
 
+## Troubleshooting
+
+Read-only checks; share their output:
+
+```sh
+ls -lde ~ ~/.config ~/.config/wezterm   # WezTerm config: Permission denied
+tail -n 50 ~/.config/herdr/herdr-server.log   # herdr: client socket timeout
+```
+
 ## Repository
 
 [`setup.sh`](setup.sh) is the whole installer; [`tests/run.sh`](tests/run.sh) runs it offline in a throwaway HOME with stub tools. MIT licensed; installed tools keep their own licenses.
