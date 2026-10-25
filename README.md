@@ -9,7 +9,7 @@ One command sets up my AI engineering workflow, so lab members can copy it:
 
 ## 1. Check prerequisites
 
-Done when each is present. Verified on macOS (Apple silicon); Linux relies on upstream installers; WezTerm is verified only offline.
+Done when each is present. Verified on macOS (Apple silicon); Linux relies on upstream installers.
 
 - `git`, `curl`, `gh`, `node`, `jq` (macOS: `brew install git gh node jq`)
 - WezTerm: [Homebrew](https://brew.sh) on macOS. On Linux, install [WezTerm](https://wezterm.org/install/linux.html) and the [font](https://www.nerdfonts.com/font-downloads) yourself.
@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/lobennett/agentic-engineering/main/
 
 To read it first: `git clone https://github.com/lobennett/agentic-engineering && agentic-engineering/setup.sh`
 
-It asks before each step; decline to skip one. Without a terminal it stops; `--yes` accepts every step. Done when it prints **Next**; follow each item there.
+It asks before each step; `--yes` accepts all. Done when it prints **Next**; follow each item there.
 
 It changes only:
 
@@ -36,7 +36,7 @@ Path overrides are in the [`setup.sh`](setup.sh) header.
 
 ## 3. Sign in yourself
 
-The script never touches credentials. Run `gh auth login`, and sign in to your coding agent on first start.
+Run `gh auth login`, and sign in to your coding agent on first start.
 
 ## 4. Use it
 
@@ -51,25 +51,33 @@ Ask the first mate: "look at my repo X, fix the flaky test and open a PR".
 
 In a project, run `/setup-matt-pocock-skills` once, then `/grill-with-docs` before a change, `/tdd` while building, `/ask-matt` when unsure.
 
-For Sherlock, run `ssh sherlock` in a WezTerm tab, after defining that host per Sherlock's [connection guide](https://www.sherlock.stanford.edu/docs/advanced-topics/connection/). Nothing is installed on Sherlock.
+For Sherlock, run `ssh sherlock` in a WezTerm tab, after defining that host per Sherlock's [connection guide](https://www.sherlock.stanford.edu/docs/advanced-topics/connection/).
 
 ## Update
 
-Re-running the installer skips installed pieces and never pulls or resets checkouts. To update:
+Re-running the installer skips installed pieces and never pulls checkouts. To update:
 
 - Herdr: `herdr update`
 - Firstmate: `/updatefirstmate` in a session (fast-forward only)
 - Skills: Claude Code: `claude plugin update mattpocock-skills@mattpocock`. Codex refreshes at startup. Pi: `pi update git:github.com/lobennett/skills`
-- WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`; config: `git -C ~/.config/wezterm pull --ff-only --no-rebase` (git refuses, changing nothing, if upstream changed your edited `launch.lua`)
+- WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`; config: `git -C ~/.config/wezterm pull --ff-only --no-rebase`
 
 ## Troubleshooting
 
-Read-only checks; share their output. WezTerm config `Permission denied`, then herdr client socket timeout:
+For WezTerm config `Permission denied`, then herdr socket timeout, share these read-only checks:
 
 ```sh
 ls -lde ~ ~/.config ~/.config/wezterm
 tail -n 50 ~/.config/herdr/herdr-server.log
 ```
+
+If your personal `~/.config` is root-owned by mistake, reset only its owner from your normal account with administrator approval:
+
+```sh
+sudo chown "$(id -un)" "$HOME/.config"
+```
+
+Group, mode and contents stay unchanged. An IT-managed `~/.config` belongs to your administrator. Then re-run setup without sudo.
 
 ## Repository
 
