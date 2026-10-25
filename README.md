@@ -64,11 +64,11 @@ Re-running the installer skips installed pieces and never pulls or resets checko
 
 ## Troubleshooting
 
-Read-only checks; share their output:
+Read-only checks; share their output. WezTerm config `Permission denied`, then herdr client socket timeout:
 
 ```sh
-ls -lde ~ ~/.config ~/.config/wezterm   # WezTerm config: Permission denied
-tail -n 50 ~/.config/herdr/herdr-server.log   # herdr: client socket timeout
+ls -lde ~ ~/.config ~/.config/wezterm
+tail -n 50 ~/.config/herdr/herdr-server.log
 ```
 
 ## Repository
