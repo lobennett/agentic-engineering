@@ -23,7 +23,7 @@ curl -fsSL https://raw.githubusercontent.com/lobennett/agentic-engineering/main/
 
 To read it first: `git clone https://github.com/lobennett/agentic-engineering && agentic-engineering/setup.sh`
 
-It asks before each step; `--yes` accepts all. Done when it prints **Next**; follow each item there.
+It asks before each step; `--yes` accepts all. Done when it prints **Next**; follow it.
 
 It changes only:
 
