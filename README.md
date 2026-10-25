@@ -29,7 +29,7 @@ It changes only:
 
 - **Herdr**: `~/.local/bin/herdr`, via the official checksum-verified installer
 - **Firstmate**: `~/firstmate` (git clone); `config/backend` = `herdr` if unset
-- **Skills**: plugin entries under `~/.claude`, `~/.codex/config.toml` and its plugin cache, or a package under `~/.pi/agent`
+- **Skills**: Claude Code: plugin entries under `~/.claude`. Codex: `~/.codex/config.toml` and its plugin cache. Pi: a package under `~/.pi/agent`
 - **WezTerm**: on macOS, casks `wezterm@nightly` and `font-jetbrains-mono-nerd-font`; config cloned into `~/.config/wezterm` (or `$XDG_CONFIG_HOME/wezterm`) only if none exists. Without fish, `config/launch.lua` can start your login shell instead
 
 Path overrides are in the [`setup.sh`](setup.sh) header.
@@ -59,15 +59,8 @@ Re-running the installer skips installed pieces and never pulls or resets checko
 
 - Herdr: `herdr update`
 - Firstmate: `/updatefirstmate` in a session (fast-forward only)
-- Skills: `claude plugin update mattpocock-skills@mattpocock`; Codex refreshes at startup; `pi update git:github.com/lobennett/skills`
+- Skills: Claude Code: `claude plugin update mattpocock-skills@mattpocock`. Codex refreshes at startup. Pi: `pi update git:github.com/lobennett/skills`
 - WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`; config: `git -C ~/.config/wezterm pull --ff-only --no-rebase` (git refuses, changing nothing, if upstream changed your edited `launch.lua`)
-
-## Troubleshooting
-
-Reported, causes unconfirmed:
-
-- Cloning the WezTerm config fails with `Permission denied`: check ownership with `ls -ld ~/.config ~/.config/wezterm`.
-- `herdr` times out waiting for its client socket: read `~/.config/herdr/herdr-server.log`.
 
 ## Repository
 
