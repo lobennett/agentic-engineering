@@ -1,21 +1,21 @@
 # agentic-engineering
 
-One command sets up the AI engineering workflow I use, so lab members can copy it:
+One command sets up my AI engineering workflow, so lab members can copy it:
 
 - **[Herdr](https://herdr.dev)**: the terminal runtime your coding agents live in.
-- **[Firstmate](https://github.com/lobennett/firstmate)**: one agent you talk to; it runs agents in Herdr tabs and returns finished pull requests. My fork of [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate), kept in sync.
-- **[Skills](https://github.com/lobennett/skills)**: Matt Pocock's engineering skills (grilling, specs, TDD, code review), from my fork of [mattpocock/skills](https://github.com/mattpocock/skills), for whichever of Claude Code, Codex and Pi you have.
+- **[Firstmate](https://github.com/lobennett/firstmate)**: one agent you talk to; it runs agents in Herdr tabs and returns pull requests. My fork of [kunchenguid/firstmate](https://github.com/kunchenguid/firstmate), kept in sync.
+- **[Skills](https://github.com/lobennett/skills)**: Matt Pocock's engineering skills, from my fork of [mattpocock/skills](https://github.com/mattpocock/skills), for whichever of Claude Code, Codex and Pi you have.
 - **[WezTerm](https://wezterm.org)**: the terminal app, with [KevinSilvester/wezterm-config](https://github.com/KevinSilvester/wezterm-config) and its JetBrainsMono Nerd Font.
 
-## Prerequisites
+## 1. Check prerequisites
 
-macOS or Linux, per the upstream installers. Verified on macOS (Apple silicon); the WezTerm step only in offline tests.
+Done when each is present. Verified on macOS (Apple silicon); Linux relies on upstream installers; WezTerm is verified only offline.
 
 - `git`, `curl`, `gh`, `node`, `jq` (macOS: `brew install git gh node jq`)
 - WezTerm: [Homebrew](https://brew.sh) on macOS. On Linux, install [WezTerm](https://wezterm.org/install/linux.html) and the [font](https://www.nerdfonts.com/font-downloads) yourself.
-- At least one coding agent, with its own subscription: [Claude Code](https://code.claude.com/docs/en/setup), [Codex](https://github.com/openai/codex) or [Pi](https://pi.dev)
+- A coding agent with its own subscription: [Claude Code](https://code.claude.com/docs/en/setup), [Codex](https://github.com/openai/codex) or [Pi](https://pi.dev)
 
-## Install
+## 2. Install
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/lobennett/agentic-engineering/main/setup.sh | bash
@@ -23,22 +23,22 @@ curl -fsSL https://raw.githubusercontent.com/lobennett/agentic-engineering/main/
 
 To read it first: `git clone https://github.com/lobennett/agentic-engineering && agentic-engineering/setup.sh`
 
-It asks before each step; decline one to leave it out. `--yes` answers every question.
+It asks before each step; decline to skip one. Without a terminal it stops; `--yes` accepts every step. Done when it prints **Next**; follow each item there.
 
-## What changes on disk
+It changes only:
 
-- **Herdr**: `~/.local/bin/herdr`, through the official checksum-verified installer
-- **Firstmate**: `~/firstmate` (git clone) and `~/firstmate/config/backend` = `herdr`, only if absent
-- **Skills**: Claude Code: plugin entries under `~/.claude`. Codex: `~/.codex/config.toml` and its plugin cache. Pi: a package under `~/.pi/agent`
-- **WezTerm**: macOS: casks `wezterm@nightly` (recommended) and `font-jetbrains-mono-nerd-font`. Config: git clone into `~/.config/wezterm` (or `$XDG_CONFIG_HOME/wezterm`), only if no WezTerm config exists. Without fish, `config/launch.lua` can start your login shell
+- **Herdr**: `~/.local/bin/herdr`, via the official checksum-verified installer
+- **Firstmate**: `~/firstmate` (git clone); `config/backend` = `herdr` if unset
+- **Skills**: plugin entries under `~/.claude`, `~/.codex/config.toml` and its plugin cache, or a package under `~/.pi/agent`
+- **WezTerm**: on macOS, casks `wezterm@nightly` and `font-jetbrains-mono-nerd-font`; config cloned into `~/.config/wezterm` (or `$XDG_CONFIG_HOME/wezterm`) only if none exists. Without fish, `config/launch.lua` can start your login shell instead
 
-Nothing else is touched; overrides are in the `setup.sh` header.
+Path overrides are in the [`setup.sh`](setup.sh) header.
 
-## Logins you do yourself
+## 3. Sign in yourself
 
-The script never touches credentials. Run `gh auth login`, and sign in to your coding agent when you first start it. Herdr and WezTerm need no account.
+The script never touches credentials. Run `gh auth login`, and sign in to your coding agent on first start.
 
-## Use it
+## 4. Use it
 
 Open WezTerm, then:
 
@@ -47,21 +47,28 @@ herdr                      # the terminal runtime
 cd ~/firstmate && claude   # in a Herdr pane; or codex, or pi
 ```
 
-For Sherlock, run `ssh sherlock` in a WezTerm tab. Set up the `sherlock` SSH host with Sherlock's [connection guide](https://www.sherlock.stanford.edu/docs/advanced-topics/connection/). Nothing is installed on Sherlock.
+Ask the first mate: "look at my repo X, fix the flaky test and open a PR".
 
-Ask the first mate: "look at my repo X, fix the flaky test and open a PR". Its first session checks its toolchain and asks before installing anything.
+In a project, run `/setup-matt-pocock-skills` once, then `/grill-with-docs` before a change, `/tdd` while building, `/ask-matt` when unsure.
 
-In a project, run `/setup-matt-pocock-skills` once. Then `/grill-with-docs` before a change, `/tdd` while building, `/ask-matt` when unsure.
+For Sherlock, run `ssh sherlock` in a WezTerm tab, after defining that host per Sherlock's [connection guide](https://www.sherlock.stanford.edu/docs/advanced-topics/connection/). Nothing is installed on Sherlock.
 
-## Update or re-run
+## Update
 
-Re-run the install command. Installed pieces are skipped; existing checkouts are never pulled or reset.
+Re-running the installer skips installed pieces and never pulls or resets checkouts. To update:
 
 - Herdr: `herdr update`
-- Firstmate: `/updatefirstmate` inside a session (fast-forward only)
-- Skills: Claude Code: `claude plugin update mattpocock-skills@mattpocock`. Codex refreshes at startup. Pi: `pi update git:github.com/lobennett/skills`
-- WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`. Config: `git -C ~/.config/wezterm pull --ff-only --no-rebase` (a `launch.lua` edit survives unless upstream changed it; then git refuses, changing nothing)
+- Firstmate: `/updatefirstmate` in a session (fast-forward only)
+- Skills: `claude plugin update mattpocock-skills@mattpocock`; Codex refreshes at startup; `pi update git:github.com/lobennett/skills`
+- WezTerm: `brew upgrade --cask wezterm@nightly --greedy-latest`; config: `git -C ~/.config/wezterm pull --ff-only --no-rebase` (git refuses, changing nothing, if upstream changed your edited `launch.lua`)
+
+## Troubleshooting
+
+Reported, causes unconfirmed:
+
+- Cloning the WezTerm config fails with `Permission denied`: check ownership with `ls -ld ~/.config ~/.config/wezterm`.
+- `herdr` times out waiting for its client socket: read `~/.config/herdr/herdr-server.log`.
 
 ## Repository
 
-`setup.sh` is the whole installer. `tests/run.sh` runs it offline in a throwaway HOME with stub tools. MIT licensed; each installed tool and config keeps its own license.
+[`setup.sh`](setup.sh) is the whole installer; [`tests/run.sh`](tests/run.sh) runs it offline in a throwaway HOME with stub tools. MIT licensed; installed tools keep their own licenses.
